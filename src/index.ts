@@ -3,6 +3,11 @@ import dotenv from "dotenv";
 import OpenAI from "openai";
 import { randomUUIDv7 } from "bun";
 import type { ChatCompletionMessageParam } from "openai/resources";
+import {
+  loadConversationsFromFile,
+  saveConversationsToFile,
+} from "./utils/conversations";
+import { saveResponseToFile } from "./utils/aiResponses";
 
 dotenv.config();
 
@@ -16,12 +21,7 @@ const openaiClient = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-type IMessage = {
-  role: string;
-  content: string;
-};
-
-const CONVERSATIONS = new Map<string, IMessage[]>();
+const CONVERSATIONS = await loadConversationsFromFile();
 
 APP.get("/api/chat", async (req: Request, res: Response) => {
   try {
@@ -54,7 +54,8 @@ APP.get("/api/chat", async (req: Request, res: Response) => {
       max_completion_tokens: 100,
     });
 
-    console.log(`🎉 OpenAI Response: ${JSON.stringify(completion)}`);
+    console.log(`🎉 OpenAI Response: ${JSON.stringify(completion)}}`);
+    await saveResponseToFile(completion);
 
     const { role, content } = completion.choices[0]?.message!;
 
@@ -64,6 +65,7 @@ APP.get("/api/chat", async (req: Request, res: Response) => {
     });
 
     CONVERSATIONS.set(conversationId, messages);
+    saveConversationsToFile(CONVERSATIONS);
 
     res.status(200).json({
       status: "Success",
