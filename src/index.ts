@@ -1,6 +1,8 @@
 import express, { type Request, type Response } from "express";
 import dotenv from "dotenv";
 import OpenAI from "openai";
+import { randomUUIDv7 } from "bun";
+import type { ChatCompletionMessageParam } from "openai/resources";
 
 dotenv.config();
 
@@ -14,34 +16,61 @@ const openaiClient = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+type IMessage = {
+  role: string;
+  content: string;
+};
+
+const CONVERSATIONS = new Map<string, IMessage[]>();
+
 APP.get("/api/chat", async (req: Request, res: Response) => {
   try {
-    const { prompt } = req.body;
+    let { prompt, conversationId } = req.body;
+
+    if (!conversationId) {
+      conversationId = randomUUIDv7();
+      CONVERSATIONS.set(conversationId, []);
+    }
+
+    const messages = CONVERSATIONS.get(conversationId) ?? [];
+
+    if (messages.length === 0) {
+      messages.push({
+        role: "system",
+        content:
+          "You are a helpful AI Chatbot Assistance. Give user query's answer in precise and to the point. You have all previous conversation along with user query. First go through this, to get the context. Then, reply the user query promptly. Remember the answer should complete in 100 tokens.",
+      });
+    }
+
+    messages.push({
+      role: "user",
+      content: prompt,
+    });
 
     const completion = await openaiClient.chat.completions.create({
       model: "gemma3:1b",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a helpful assistance. Give user query's answer in precise and to the point. Remember the answer should complete in 100 tokens.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
+      messages: messages as ChatCompletionMessageParam[],
       temperature: 0.2,
       max_completion_tokens: 100,
     });
 
     console.log(`🎉 OpenAI Response: ${JSON.stringify(completion)}`);
 
+    const { role, content } = completion.choices[0]?.message!;
+
+    messages.push({
+      role: role,
+      content: content ?? "",
+    });
+
+    CONVERSATIONS.set(conversationId, messages);
+
     res.status(200).json({
       status: "Success",
       prompt: prompt,
+      conversationId: conversationId,
       model: completion.model,
-      message: completion.choices[0]?.message.content,
+      message: content,
       usage: completion.usage,
     });
   } catch (err: any) {
