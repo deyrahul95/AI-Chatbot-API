@@ -81,4 +81,7 @@ export const responseRepository = {
     RESPONSES.set(response.id, response);
     await saveResponseToFile();
   },
+  getResponse(responseId: string): IResponse | undefined {
+    return RESPONSES.get(responseId);
+  },
 };
