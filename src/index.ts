@@ -35,7 +35,7 @@ const chatSchema = z
   })
   .required();
 
-APP.get("/api/chat", async (req: Request, res: Response) => {
+APP.post("/api/chat", async (req: Request, res: Response) => {
   try {
     const parseResult = chatSchema.safeParse(req.body);
 
@@ -104,6 +104,33 @@ APP.get("/api/chat", async (req: Request, res: Response) => {
       message: `Failed to get AI Response. Error: ${err.message}`,
     });
   }
+});
+
+APP.get("/api/conversations", (_: Request, res: Response) => {
+  res.status(200).json({
+    status: "Success",
+    data: {
+      conversationIds: Array.from(CONVERSATIONS.keys()),
+    },
+  });
+});
+
+APP.get("/api/conversations/:id", (req: Request, res: Response) => {
+  const conversationId = req.params.id as string;
+  const messages = CONVERSATIONS.get(conversationId);
+
+  if (!messages || messages?.length === 0) {
+    res.status(404).json({
+      status: "Error",
+      message: `Conversation with id: ${conversationId} not found in database.`,
+    });
+    return;
+  }
+
+  res.status(200).json({
+    status: "Success",
+    data: messages,
+  });
 });
 
 APP.listen(PORT, () => {
