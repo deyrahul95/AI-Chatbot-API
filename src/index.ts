@@ -8,6 +8,7 @@ import {
   saveConversationsToFile,
 } from "./utils/conversations";
 import { saveResponseToFile } from "./utils/aiResponses";
+import z from "zod";
 
 dotenv.config();
 
@@ -23,8 +24,29 @@ const openaiClient = new OpenAI({
 
 const CONVERSATIONS = await loadConversationsFromFile();
 
+const chatSchema = z
+  .object({
+    prompt: z
+      .string()
+      .trim()
+      .min(1, "Prompt is required!")
+      .max(1000, "Prompt is too long (Max. 1000 characters)"),
+    conversationId: z.uuid().nullable(),
+  })
+  .required();
+
 APP.get("/api/chat", async (req: Request, res: Response) => {
   try {
+    const parseResult = chatSchema.safeParse(req.body);
+
+    if (!parseResult.success) {
+      res.status(400).json({
+        status: "Error",
+        ...z.treeifyError(parseResult.error),
+      });
+      return;
+    }
+
     let { prompt, conversationId } = req.body;
 
     if (!conversationId) {
