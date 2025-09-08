@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { conversationRepository } from "../repositories/conversations.repository";
 import type { ChatCompletion, ChatCompletionMessageParam } from "openai/resources";
 import { responseRepository } from "../repositories/responses.repository";
+import type { IMessage } from "../types/IMessage";
 
 type IUsage = {
   completionTokens: number | undefined;
@@ -18,12 +19,12 @@ type IAIResult = {
   usage: IUsage | undefined;
 };
 
-const openaiClient = new OpenAI({
+const OPENAI_CLIENT = new OpenAI({
   baseURL: process.env.OPENAI_BASE_URL,
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const systemPrompt = {
+const SYSTEM_PROMPT: IMessage = {
   role: "system",
   content: `You are a helpful AI Chatbot Assistance. 
     Give user query's answer in precise and to the point. 
@@ -62,15 +63,16 @@ export const chatService = {
     const messages = conversationRepository.getMessages(conversationId);
 
     if (messages.length === 0) {
-      messages.push(systemPrompt);
+      messages.push(SYSTEM_PROMPT);
     }
 
-    messages.push({
+    const userPrompt: IMessage = {
       role: "user",
       content: prompt,
-    });
-    
-    const completion = await openaiClient.chat.completions.create({
+    };
+    messages.push(userPrompt);
+
+    const completion = await OPENAI_CLIENT.chat.completions.create({
       model: "gemma3:1b",
       messages: messages as ChatCompletionMessageParam[],
       temperature: 0.2,
@@ -78,10 +80,19 @@ export const chatService = {
     });
 
     console.log(`🎉 OpenAI Response: ${JSON.stringify(completion)}}`);
-    await responseRepository.saveResponse(completion);
+    const lastMessageID =
+      conversationRepository.getLastMessageID(conversationId);
+    await responseRepository.saveResponse(
+      completion,
+      conversationId,
+      userPrompt,
+      lastMessageID,
+      SYSTEM_PROMPT
+    );
 
     const { role, content } = completion.choices[0]?.message!;
     messages.push({
+      responseId: completion.id,
       role: role,
       content: content ?? "N/A",
     });

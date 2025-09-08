@@ -10,11 +10,19 @@ export const conversationsController = {
       },
     });
   },
+  getAll(_: Request, res: Response) {
+    const conversations = conversationRepository.getAll();
+
+    res.status(200).json({
+      status: "Success",
+      data: conversations,
+    });
+  },
   getDetails(req: Request, res: Response) {
     const conversationId = req.params.id as string;
-    const messages = conversationRepository.getMessages(conversationId);
+    const conversation = conversationRepository.getById(conversationId);
 
-    if (!messages || messages?.length === 0) {
+    if (!conversation) {
       res.status(404).json({
         status: "Error",
         message: `Conversation with id: ${conversationId} not found in database.`,
@@ -24,7 +32,7 @@ export const conversationsController = {
 
     res.status(200).json({
       status: "Success",
-      data: messages,
+      data: conversation,
     });
   },
 };
